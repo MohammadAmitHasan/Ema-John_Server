@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -13,14 +13,32 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 
 async function run() {
   try {
+    await client.connect();
+    const productCollection = client.db("Ema_John").collection("products");
 
     app.get('/products', async (req, res) => {
-      await client.connect();
-      const productCollection = client.db("Ema_John").collection("products");
+      // Get the query data
+      const activePage = parseInt(req.query.activePage) || 0;
+      const size = parseInt(req.query.size) || 10;
       const query = {};
       const cursor = productCollection.find(query);
-      const products = await cursor.toArray();
+      // Load specific page data
+      const products = await cursor.skip(activePage * size).limit(size).toArray();
       res.send(products);
+    })
+
+    app.get('/totalProducts', async (req, res) => {
+      const totalProducts = await productCollection.estimatedDocumentCount();
+      res.send({ totalProducts });
+    })
+
+    app.post('/productKeys', async (req, res) => {
+      const keys = req.body;
+      const ids = keys.map(key => ObjectId(key));
+      const query = { _id: { $in: ids } }
+      const cursor = productCollection.find(query)
+      const result = await cursor.toArray();
+      res.send(result);
     })
 
   }
